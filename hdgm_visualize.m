@@ -45,25 +45,29 @@ end
 
 function plot_genmodel(h_fg,M,i)
 clf;        % clear figure;
-x=0.30;     % center
+x=0.28;     % center
 msz=0.15;   % map size
 dy=msz;     % relative step
 iepoch=M.S(i,1); ipath=M.S(i,2); maze=M.S(i,7); istr=sprintf('Block %d  Maze %d Trace %d',iepoch,maze,ipath);
 
-y=0.3*dy;   annotation(h_fg,'textbox',[x 1-y 0.45 0.02],'String','Hierarchical Dynamic Generative Model','FontSize',16,'LineStyle','none');
+y=0.152*dy;   annotation(h_fg,'textbox',[x 1-y 0.45 0.02],'String','Hierarchical Dynamic Generative Model','FontSize',16,'LineStyle','none');
 y=y+0.2*dy; annotation(h_fg,'textbox',[x+.1 1-y 0.45 0.02],'String',istr,'FontSize',14,'LineStyle','none');
 
-% Map (p(c)=z and Theta=Map)
-y=y+0.4*dy; annotation(h_fg,'textbox',[x-msz*.6, 1-y 0.5 0.02],'String','Mixture','FontSize',14,'LineStyle','none');
+% Mixture probabilities (p(z) and parameters
+y=y+0.4*dy; annotation(h_fg,'textbox',[x-msz*.25, 1-y 0.5 0.02],'String','Mixture','FontSize',14,'LineStyle','none');
+y=y-0.1*dy; annotation(h_fg,'rectangle',[x-0.17, 1-y-2.7*msz 0.33 0.38],'LineStyle',':','LineWidth',2,'Color',[0.7 0.7 0.7]);
+y=y+0.35*dy; annotation(h_fg,'textbox',[x-msz*.5, 1-y 0.5 0.02],'String','Cluster probability','FontSize',12,'LineStyle','none');
 y=y+0.6*dy; plot_z(M,i  ,x    ,y,msz);     % Plot z(t)
-y=y+0.2*dy; annotation(h_fg,'textbox',[x-msz*.2, 1-y 0.5 0.02],'String','cluster','FontSize',11,'LineStyle','none');
 
-y=y+0.3*dy; annotation(h_fg,'textbox',[x-msz*.6, 1-y 0.5 0.02],'String','Mixture parameters (maps)','FontSize',14,'LineStyle','none');
-y=y+0.7*dy; plot_maps(M,i,x,y,msz*.8);
+y=y+0.5*dy; annotation(h_fg,'textbox',[x-msz*.75, 1-y 0.5 0.02],'String','Cluster parameters (maps)','FontSize',12,'LineStyle','none');
+y=y+0.6*dy; plot_maps(M,i,x,y,msz*.8);
+
+
+
 
 % TRACE
-y=y+0.7*dy; l=0.02; ddy=[-.5 .5]*l;  annotation(h_fg,'arrow',[x x],1-y-ddy,'HeadLength',6,'HeadWidth',6,'LineWidth',3,'Color','b');
-y=y+0.4*dy; annotation(h_fg,'textbox',[x-msz*.6, 1-y 0.2 0.02],'String','Sequence code','FontSize',14,'LineStyle','none');
+y=y+0.8*dy; l=0.02; ddy=[-.5 .5]*l;  annotation(h_fg,'arrow',[x x],1-y-ddy,'HeadLength',6,'HeadWidth',6,'LineWidth',3,'Color','b');
+y=y+0.3*dy; annotation(h_fg,'textbox',[x-msz*.6, 1-y 0.2 0.02],'String','Sequence code','FontSize',14,'LineStyle','none');
 y=y+0.6*dy; plot_y(M,i-0  ,x    ,y,msz);
 
 % Theta
@@ -72,9 +76,9 @@ y=y+0.3*dy; annotation(h_fg,'textbox',[x-msz*.6, 1-y 0.2 0.02],'String','Item co
 y=y+0.6*dy; plot_prx(M,i,x,y,msz);   % plot xpr
 
 % z-trend within the current trial
-x=0.7; y=0.9*dy;
-annotation(h_fg,'textbox',[x-msz*.6, 1-y 0.3 0.02],'String','Mixture dynamics','FontSize',14,'LineStyle','none');
-y=y+0.7*dy; plot_ztrend(M,i,x,y,msz)
+x=0.7; y=0.7*dy;
+annotation(h_fg,'textbox',[x-msz*.6, 1-y 0.5 0.02],'String','Mixture dynamics','FontSize',14,'LineStyle','none');
+y=y+0.8*dy; plot_ztrend(M,i,x,y,msz)
 
 y=y+0.6*dy; annotation(h_fg,'textbox',[x-msz*.5, 1-y 0.2 0.02],'String','Cluster selection','FontSize',14,'LineStyle','none');
 y=y+1.6*dy;   plot_clusters(M,i,x,y,msz*1.5);
@@ -83,7 +87,8 @@ colormap pink;drawnow;
 end
 
 function plot_ztrend(M,i,x,y,sz)
- axes('Position',[x-sz/2,1-y,sz,sz/2]); hold on;
+ Leg={};for k=1:numel(M.LM.k), Leg{k}=sprintf('cluster %d',k); end
+ axes('Position',[x-sz*.7,1-y,sz*1.2,sz*.7]); hold on;
  iepoch=M.S(i,1); 
 
  switch M.plot_selector,
@@ -96,12 +101,13 @@ function plot_ztrend(M,i,x,y,sz)
     I=find(M.SS(:,1)==iepoch & M.SS(:,2)==iswr);  
     zz=M.zS(I,M.LM.k);    % (2) replay
  end
- plot(zz);
- xlim([0.5 size(zz,1)+.5]); ylim([0 1]); xlabel('trial step'); ylabel('p(z)'); 
+ plot(zz,'LineWidth',1);
+ xlim([0.5 size(zz,1)+.5]); ylim([0 1]); xlabel('trial step'); ylabel('p(c)'); 
+ legend(Leg,'Position',[x+sz 1-y+sz*0.2 sz*0.2 sz*0.2],'LineWidth',1);
 end
 
 function plot_clusters(M,i,x,y,sz)
- xsz=1.5*sz;
+ xsz=1.3*sz;
  axes('Position',[x-xsz/2,1-y,xsz,sz]); hold on;
  hold on; set(gca,'LineWidth',2); 
  c_sty='*osv^dp.+x'; c_col='rmgbkcygbk'; 
@@ -126,7 +132,7 @@ function plot_clusters(M,i,x,y,sz)
  end
  xlim([0.5 numel(map)+.5]); ylim([0 M.nmaps+.5]);
  xlabel('Time step and block'); ylabel('Selected Cluster');
- legend(LEG,'Position',[x+0.6*xsz 1-y sz*0.3 sz*0.2],'LineWidth',1);
+ legend(LEG,'Position',[x+0.7*xsz 1-y+sz*0.5 sz*0.2 sz*0.2],'LineWidth',1);
 end
 
 function plot_z(M,i,x,y,sz)
@@ -135,7 +141,7 @@ function plot_z(M,i,x,y,sz)
    case 1, bar(M.z(i,M.LM.k), 'LineWidth',2); 
    case 2, bar(M.zS(i,M.LM.k),'LineWidth',2); 
  end
- axis tight; ylim([0 1]); axis off;
+ axis tight; ylim([0 1]); xlabel('cluster'); ylabel('p(c)'); 
 end
 
 function plot_maps(M,i,x0,y0,sz)
