@@ -14,7 +14,7 @@ To run the visualization, please download the code and evoke *>>hdgm_visualize* 
 
 ## Authors
 
-* **Ivilin Stoianov** - *ideas, algorithm, and code* - [stoianov](https://github.com/stoianov)
+* **Ivilin Stoianov** - *ideas, algorithm, and code*
 * **Domenico Maisto** - *ideas* 
 * **Giovanni Pezzulo** - *ideas*
 
