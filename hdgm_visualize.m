@@ -6,15 +6,15 @@
 % Stoianov, I., Maisto, D., & Pezzulo, G. (2020) BioRxiv. doi:10.1101/2020.01.16.908889
 % "The hippocampal formation as a hierarchical generative model supporting generative replay and continual learning." 
 %
-% hdgm_visualize(replica,trial_selector) show all or just selected navigation trials of the selected learner
+% hdgm_visualize(replica,trial_selector) show all or selected navigation and replay trials of the selected learner
 %     trial_selector=0 shows all trials (SLOW demo)
-%     trial_selector=1 (default) shows the first and last two trials of each block (each in different maze)
-%                      the 1st trial of each block is interesting because it shows the transition in belief 
-%                      from the previous maze to the new maze
-%     trial_selector=2 shows the the first two and last two trials of the last block only (QUICK demo).
+%     trial_selector=1 (default) shows the first and last two navigation trials of each block (each in different maze)
+%                      and the first 3 offline replays, generated after each navigation block 
+%                      Note that the 1st trial of each navigation block is interesting because it shows the transition in belief 
+%                      from the previous maze to the new maze.                        
+%     trial_selector=2 shows the the first two and last two trials of the last block only, and the first three replays afterward (QUICK demo).
 %
-% Note that the visualization shows only the last state of the maps
-%
+% Note that the visualization shows only the last state of the cluster parameters (or maps)
 % 
 
 function hdgm_visualize(replica,trial_selector)
@@ -27,11 +27,40 @@ M=MM.M{replica,condition};  % M is a structure containing the learner state
 fgn=1; h_fg=figure(fgn); clf reset;
 set(h_fg,'Position',[1500,1000,1000,1000],'Renderer','zbuffer','Color',[1 1 1],'PaperPositionMode', 'auto');
 M.plot_selector=1;          % 1:trace, 2replay
+M.plot_inav=0;              % navigation time
+M.plot_irep=0;              % replay time
+
+BL=M.S(:,1);                % Navigation block
+TR=M.S(:,2);                % Trial within Block
+ST=M.S(:,3);                % Step of current trial
+
+SBL=M.SS(:,1);              % Block in the Replay log
+STR=M.SS(:,2);              % Replay number within block
+
 for i=1:M.tS
-  iepoch=M.S(i,1); ipath=M.S(i,2); 
-  if trial_selector>=2 && (iepoch<M.nepisodes), continue; end % Show just the last block
-  if trial_selector>=1 && (ipath>2 && ipath<(M.npaths-1)), continue; end % Show the first 2 and last 2 trials of each block
+    
+  % Visualize navigation trials  
+  ibl=BL(i); itr=TR(i); ist=ST(i);  nsteps=max(ST( BL==ibl & TR==itr ));
+  if trial_selector>=2 && (ibl<M.nepisodes), continue; end % Show just the last block
+  if trial_selector>=1 && (itr>2 && itr<(M.npaths-1)), continue; end % Show the first 2 and last 2 trials of each block
+  M.plot_inav=i;
+  
+  if M.plot_irep==0,        % Start visualization from internal trial. Then, find the last replay of the last block
+    II=find(SBL<ibl); if ~isempty(II), M.plot_irep=II(end); end  
+  end
+  
   plot_genmodel(h_fg,M,i);
+  
+  % At the end of a navigation block, visualize few replay trials
+  if itr==M.npaths && ist==nsteps   % Just shown last step of last trial of the current block
+    I=find( SBL==ibl & STR<=3 ); % Select 3 replays to show 
+    M.plot_selector=2;          % Switch to replay visualization mode
+    for j=1:numel(I)
+      M.plot_irep=I(j);         % Update replay time  
+      plot_genmodel(h_fg,M,I(j));
+    end
+    M.plot_selector=1;          % Return to navigation visualization mode
+  end
 end
 
 end
@@ -45,11 +74,18 @@ end
 
 function plot_genmodel(h_fg,M,i)
 clf;        % clear figure;
-x=0.28;     % center
+x=0.25;     % center
 msz=0.15;   % map size
 dy=msz;     % relative step
-iepoch=M.S(i,1); ipath=M.S(i,2); maze=M.S(i,7); istr=sprintf('Block %d  Maze %d Trace %d',iepoch,maze,ipath);
+tnav=M.plot_inav;
+trep=M.plot_irep;
+iepoch=M.S(tnav,1); itrace=M.S(tnav,2); maze=M.S(tnav,7);   % Navigation info
+if trep>0, irep=M.SS(trep,2); end                           % Replay info
 
+switch M.plot_selector
+    case 1, istr=sprintf('Block %d  Maze %d Trace %d',iepoch,maze,itrace);
+    case 2, istr=sprintf('Block %d  Replay %d',iepoch,irep);
+end
 y=0.152*dy;   annotation(h_fg,'textbox',[x 1-y 0.45 0.02],'String','Hierarchical Dynamic Generative Model','FontSize',16,'LineStyle','none');
 y=y+0.2*dy; annotation(h_fg,'textbox',[x+.1 1-y 0.45 0.02],'String',istr,'FontSize',14,'LineStyle','none');
 
@@ -76,12 +112,15 @@ y=y+0.3*dy; annotation(h_fg,'textbox',[x-msz*.6, 1-y 0.2 0.02],'String','Item co
 y=y+0.6*dy; plot_prx(M,i,x,y,msz);   % plot xpr
 
 % z-trend within the current trial
-x=0.7; y=0.7*dy;
+x=0.67; y=0.7*dy;
 annotation(h_fg,'textbox',[x-msz*.6, 1-y 0.5 0.02],'String','Mixture dynamics','FontSize',14,'LineStyle','none');
-y=y+0.8*dy; plot_ztrend(M,i,x,y,msz)
+y=y+0.8*dy; plot_ztrend(M,i,x,y,msz);
 
-y=y+0.6*dy; annotation(h_fg,'textbox',[x-msz*.5, 1-y 0.2 0.02],'String','Cluster selection','FontSize',14,'LineStyle','none');
-y=y+1.6*dy;   plot_clusters(M,i,x,y,msz*1.5);
+y=y+0.6*dy; annotation(h_fg,'textbox',[x-msz*.5, 1-y 0.4 0.02],'String','Cluster selection','FontSize',14,'LineStyle','none');
+y=y+0.25*dy; annotation(h_fg,'textbox',[x-msz*.3, 1-y 0.4 0.02],'String','Navigation','FontSize',14,'LineStyle','none');
+y=y+1.7*dy; plot_clusters_nav(M,x,y,msz*1.6);
+y=y+0.5*dy; annotation(h_fg,'textbox',[x-msz*.3, 1-y 0.4 0.02],'String','Replay','FontSize',14,'LineStyle','none');
+y=y+1.7*dy; plot_clusters_rep(M,x,y,msz*1.6);
 
 colormap pink;drawnow;
 end
@@ -89,37 +128,40 @@ end
 function plot_ztrend(M,i,x,y,sz)
  Leg={};for k=1:numel(M.LM.k), Leg{k}=sprintf('cluster %d',k); end
  axes('Position',[x-sz*.7,1-y,sz*1.2,sz*.7]); hold on;
- iepoch=M.S(i,1); 
 
  switch M.plot_selector,
   case 1, 
+    iepoch=M.S(i,1); 
     ipath=M.S(i,2); istep=M.S(i,3);   % current trace and step
     I=find(M.S(:,1)==iepoch & M.S(:,2)==ipath & M.S(:,3)<=istep);  
     zz=M.z( I,M.LM.k);    % Probability of each cluster (reordered) (1) navigation
   case 2, 
-    iswr=M.SS(i,2);    
-    I=find(M.SS(:,1)==iepoch & M.SS(:,2)==iswr);  
+    iepoch=M.SS(i,1); 
+    iswr=M.SS(i,2); istep=M.SS(i,3);
+    I=find(M.SS(:,1)==iepoch & M.SS(:,2)==iswr & M.SS(:,3)<=istep);  
     zz=M.zS(I,M.LM.k);    % (2) replay
  end
  plot(zz,'LineWidth',1);
  xlim([0.5 size(zz,1)+.5]); ylim([0 1]); xlabel('trial step'); ylabel('p(c)'); 
- legend(Leg,'Position',[x+sz 1-y+sz*0.2 sz*0.2 sz*0.2],'LineWidth',1);
+ legend(Leg,'Position',[x+1.6*sz 1-y+sz*0.2 sz*0.2 sz*0.2],'LineWidth',1);
 end
 
-function plot_clusters(M,i,x,y,sz)
+function plot_clusters_nav(M,x,y,sz)
+ IP=1:M.plot_inav; if isempty(IP), return; end
  xsz=1.3*sz;
  axes('Position',[x-xsz/2,1-y,xsz,sz]); hold on;
  hold on; set(gca,'LineWidth',2); 
  c_sty='*osv^dp.+x'; c_col='rmgbkcygbk'; 
  LEG={}; iLEG=0;
- IP=1:i;
- epis=M.S(IP,1); cl=M.S(IP,5); map=M.S(IP,7); 
- clm=M.LM.k_map(cl); % reorder as in the left display
+ epis=M.S(IP,1); 
+ cluster=M.S(IP,5); 
+ map=M.S(IP,7); 
+ cluster_reordered=M.LM.k_map(cluster); % reorder as in the left display
 
  for m=1:M.nmaps,
    I=find(map==m);
    if ~isempty(I), 
-     plot(I,(clm(I)),[c_col(m) c_sty(m)]); 
+     plot(I,(cluster_reordered(I)),[c_col(m) c_sty(m)]); 
      iLEG=iLEG+1; LEG{iLEG}=sprintf('maze %d',m);
    end
  end
@@ -128,12 +170,44 @@ function plot_clusters(M,i,x,y,sz)
  depis=diff(single([0;epis;M.nepisodes+1]));
  Ichange=find(depis); 
  for bl=1:numel(Ichange)-1
-   text(50+Ichange(bl),0.5,sprintf('bl.%d',bl),'Color',c_col(map(Ichange(bl))),'FontSize',10);  
+   text(50+Ichange(bl),0.3,sprintf('bl.%d',bl),'Color','k','FontSize',10);  
  end
  xlim([0.5 numel(map)+.5]); ylim([0 M.nmaps+.5]);
- xlabel('Time step and block'); ylabel('Selected Cluster');
+ xlabel('Navigation time-step'); ylabel('Selected Cluster');
  legend(LEG,'Position',[x+0.7*xsz 1-y+sz*0.5 sz*0.2 sz*0.2],'LineWidth',1);
 end
+
+function plot_clusters_rep(M,x,y,sz)
+ IP=1:M.plot_irep; if isempty(IP), return; end
+ xsz=1.3*sz;
+ axes('Position',[x-xsz/2,1-y,xsz,sz]); hold on;
+ hold on; set(gca,'LineWidth',2); 
+ c_sty='*osv^dp.+x'; c_col='rmgbkcygbk'; 
+ LEG={}; iLEG=0;
+ epis=M.SS(IP,1); 
+ cluster=M.SS(IP,5);            % The selected cluster at each replay-step
+ xmap=M.SS(IP,6);               % The inferred map for the given cluster
+ cluster_reordered=M.LM.k_map(cluster); % reorder as in the left display
+
+ for m=1:M.nmaps,
+   I=find(xmap==m);
+   if ~isempty(I), 
+     plot(I,(cluster_reordered(I)),[c_col(m) c_sty(m)]); 
+     iLEG=iLEG+1; LEG{iLEG}=sprintf('maze %d',m);
+   end
+ end
+  
+ % Block
+ depis=diff(single([0;epis;M.nepisodes+1]));
+ Ichange=find(depis); 
+ for bl=1:numel(Ichange)-1
+   text(50+Ichange(bl),0.3,sprintf('bl.%d',bl),'Color','k','FontSize',10);  
+ end
+ xlim([0.5 numel(xmap)+.5]); ylim([0 M.nmaps+.5]);
+ xlabel('Replay time-step'); ylabel('Selected Cluster');
+ legend(LEG,'Position',[x+0.7*xsz 1-y+sz*0.5 sz*0.2 sz*0.2],'LineWidth',1);
+end
+
 
 function plot_z(M,i,x,y,sz)
  axes('Position',[x-sz/2,1-y,sz,sz/2]); hold on;
